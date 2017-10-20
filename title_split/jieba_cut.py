@@ -1,11 +1,15 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 import re
-import sys
+import os,sys
 import string
 reload(sys)
 sys.setdefaultencoding('utf-8')
 import jieba
+
+#替换结巴词库
+dcit_path = os.path.join(os.path.split(os.path.realpath(__file__))[0], 'dict.txt')
+jieba.set_dictionary(dcit_path)
 
 # 如果有一些词语需要合并可以添加个人词典
 # jieba.load_userdict('userdict.txt')
