@@ -12,8 +12,7 @@ FROM
           keyword,
           tfidf,
           SUM(tfidf)OVER(Partition BY keyword) AS tfidf_t,
-          SUM(tfidf)OVER(Partition BY keyword
-                         ORDER BY ranks) AS tfidf_c
+          SUM(tfidf)OVER(Partition BY keyword  ORDER BY ranks) AS tfidf_c
    FROM
      (SELECT tag,
              keyword,
