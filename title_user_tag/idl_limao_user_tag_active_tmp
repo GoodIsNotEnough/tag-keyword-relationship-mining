@@ -1,0 +1,35 @@
+ALTER TABLE idl_limao_user_tag_active_tmp DROP PARTITION(ds<="{p0}");
+-- 计算有title更新的uid下的每个tag得分
+INSERT INTO idl_limao_user_tag_active_tmp PARTITION(ds="{p0}")
+SELECT 
+t1.uid,
+t2.tag,
+sum(t2.tag_score*t1.tid_num)/sum(t1.tid_num) AS score,
+sum(t1.tid_num) AS num,
+max(date_add(last_date,end_day)) AS validity
+FROM
+    (SELECT 
+    uid,
+    title_id,
+    last_date,
+    tid_num,
+    datediff("{p0}",last_date) AS inter_day
+    FROM idl_limao_user_title_tmp a0
+    WHERE ds="{p0}" AND uid NOT IN ("4e07cc123ac5b237")
+    ) t1
+LEFT JOIN
+    (SELECT 
+    sentence_id,
+    tag,
+    tag_score,
+    start_day,
+    end_day
+    FROM idl_title_tag_agg
+    WHERE ds="{p0}"
+    ) t2 
+ON t1.title_id=t2.sentence_id
+LEFT JOIN config_limao_remove_uid_log t3 
+ON t1.uid=t3.uid
+WHERE inter_day>=start_day AND inter_day<=end_day AND ISNULL(t3.uid)
+GROUP BY t1.uid,t2.tag;
+

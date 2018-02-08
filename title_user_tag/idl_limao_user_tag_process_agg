@@ -1,0 +1,41 @@
+ALTER TABLE idl_limao_user_tag_process_agg DROP PARTITION (ds<="{p3}");
+ALTER TABLE idl_limao_user_tag_process_agg DROP PARTITION (ds="{p0}");
+
+INSERT INTO idl_limao_user_tag_process_agg PARTITION (ds="{p0}")
+SELECT 
+uid,
+tag_detail,
+validity,
+update_dt
+FROM
+    (SELECT 
+    uid,
+    tag_raw_list AS tag_detail,
+    validity,
+    update_dt
+    FROM idl_limao_user_tag_tmp
+    WHERE ds="{p0}"
+    UNION ALL 
+    SELECT 
+    t1.uid,
+    tag_detail,
+    validity,
+    update_dt
+    FROM
+        (SELECT 
+        uid,
+        tag_detail,
+        validity,
+        update_dt
+        FROM idl_limao_user_tag_process_agg
+        WHERE ds="{p2}"
+        ) t1
+    LEFT JOIN
+        (SELECT 
+        uid
+        FROM idl_limao_user_tag_tmp
+        WHERE ds="{p0}"
+        ) t2 
+    ON t1.uid=t2.uid
+    WHERE isnull(t2.uid)
+    ) s1;

@@ -1,0 +1,36 @@
+SET mapreduce.output.fileoutputformat.compress.codec=org.apache.hadoop.io.compress.GzipCodec;
+
+ALTER TABLE idl_title_tag_agg DROP PARTITION(ds<="{p3}");
+ALTER TABLE idl_title_tag_agg DROP PARTITION(ds="{p0}");
+
+INSERT INTO idl_title_tag_agg PARTITION(ds="{p0}")
+SELECT sentence_id,
+       root_name,
+       tag,
+       max(tag_score) AS tag_score,
+       min(start_day) AS start_day,
+       min(end_day) AS end_day,
+       min(insert_dt) AS insert_dt
+FROM
+  (SELECT sentence_id,
+          root_name,
+          tag,
+          tag_score,
+          start_day,
+          end_day,
+          "{p0}" AS insert_dt
+   FROM idl_title_tag_result_tmp
+   WHERE ds='{p0}'
+   UNION ALL 
+   SELECT sentence_id,
+          root_name,
+          tag,
+          tag_score,
+          start_day,
+          end_day,
+          insert_dt
+   FROM idl_title_tag_agg
+   WHERE ds='{p2}') t1
+GROUP BY sentence_id,
+         root_name,
+         tag;

@@ -1,0 +1,32 @@
+ALTER TABLE idl_title_tag_result_1st_tmp DROP PARTITION (ds<='{p0}');
+
+INSERT INTO idl_title_tag_result_1st_tmp PARTITION (ds='{p0}')
+SELECT 
+sentence_id,
+root_name,
+tag,
+tag_score
+FROM
+    (SELECT 
+    sentence_id,
+    root_name,
+    tag,
+    tag_score,
+    SUM(tag_score) OVER(PARTITION BY sentence_id) AS partition_sum,
+    SUM(tag_score) OVER(PARTITION BY sentence_id ORDER BY tag_score) AS partition_order_sum
+    FROM
+        (SELECT 
+        t0.sentence_id,
+        t0.root_name,
+        t0.tag,
+        EXP(t0.tag_score_0+IF(ISNULL(t1.intercept),0,t1.intercept))/(1.0+EXP(t0.tag_score_0+IF(ISNULL(t1.intercept),0,t1.intercept))) AS tag_score
+        FROM
+            (SELECT *
+            FROM idl_title_tag_score_tmp
+            WHERE ds='{p0}'
+            ) t0
+        LEFT JOIN config_root_tag_intercept_log t1 
+        ON t0.root_name = t1.root_name AND t0.tag = t1.tag
+        ) t2
+    ) t3
+WHERE (partition_order_sum/partition_sum>0.1 AND tag_score>=0.03) OR tag_score > 0.1;

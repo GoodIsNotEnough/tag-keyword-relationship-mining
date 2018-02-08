@@ -1,0 +1,37 @@
+set mapreduce.map.memory.mb=2048;
+set mapreduce.map.java.opts=-Xmx1600m;
+set mapreduce.task.io.sort.mb=600;
+ALTER TABLE idl_title_tag_score_tmp DROP PARTITION (ds<='{p0}');
+
+INSERT INTO idl_title_tag_score_tmp PARTITION (ds='{p0}')
+SELECT 
+j0.sentence_id,
+j1.root_name,
+j0.tag,
+j0.tag_score_0
+FROM
+    (SELECT 
+    sentence_id,
+    tag,
+    sum(PARAMETER) AS tag_score_0
+    FROM config_title_tag_parameter_log t0
+    RIGHT JOIN
+        (SELECT 
+        sentence_id,
+        keyword
+        FROM idl_titel_token_log LATERAL VIEW OUTER explode(token) l1 AS keyword
+        WHERE ds = '{p0}' AND insert_dt='{p0}'
+        ) t1 
+    ON t0.keyword = t1.keyword
+    WHERE t0.PARAMETER IS NOT NULL
+    GROUP BY sentence_id,tag 
+    HAVING sum(PARAMETER)>0
+    ) j0
+LEFT JOIN
+    (SELECT 
+    DISTINCT root_name,
+    sentence_id
+    FROM idl_limao_cid_dim LATERAL VIEW OUTER explode(title_set) l2 AS sentence_id
+    WHERE ds = '{p0}'
+    ) j1 
+ON j0.sentence_id = j1.sentence_id;

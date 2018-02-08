@@ -1,0 +1,44 @@
+ALTER TABLE idl_limao_user_adjust_tag_tmp DROP partition(ds<="{p0}");
+-- 更新有title更新的用户tag得分和有tag过期的tag得分
+INSERT INTO idl_limao_user_adjust_tag_tmp partition(ds="{p0}")
+SELECT 
+s0.uid,
+tag,
+avg(score) AS score,
+max(num) AS num,
+max(validity) AS validity,
+max(update_dt) AS update_dt
+FROM
+    (SELECT 
+    uid,
+    tag,
+    cast(info_item[0] AS float) AS score,
+    cast(info_item[1] AS int) AS num,
+    cast(info_item[2] AS date) AS validity,
+    update_dt
+    FROM
+        (SELECT 
+        uid,
+        tag,
+        split(info,"|") AS info_item,
+        update_dt
+        FROM idl_limao_user_tag_process_agg 
+        LATERAL VIEW OUTER EXPLODE(tag_detail) a AS tag,info
+        WHERE ds="{p2}" AND validity<="{p0}"
+        ) t1
+    UNION ALL 
+    SELECT 
+    uid,
+    tag,
+    score,
+    num,
+    validity,
+    "{p0}" AS update_dt
+    FROM idl_limao_user_tag_active_tmp
+    WHERE ds="{p0}"
+    ) s0
+LEFT JOIN config_limao_remove_uid_log s1 
+ON s0.uid=s1.uid
+WHERE ISNULL(s1.uid)
+GROUP BY s0.uid,tag;
+

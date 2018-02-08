@@ -1,0 +1,43 @@
+SET hive.exec.reducers.bytes.per.reducer=268435456;
+-- tag得分标准化
+ALTER TABLE idl_limao_user_tag_tmp DROP PARTITION(ds<="{p0}");
+INSERT INTO idl_limao_user_tag_tmp PARTITION(ds="{p0}")
+SELECT 
+uid,
+str_to_map(concat_ws("\073",collect_set(tag_raw)),"\073",":") AS tag_raw_list,
+str_to_map(concat_ws("\073",collect_set(tag_value)),"\073",":") AS tag_value_list,
+SUM(IF(ISNULL(tag_value),0,1)) AS tag_num,
+min(validity) AS validity,
+max(update_dt) AS update_dt
+FROM
+    (SELECT 
+    s10.uid,
+    concat_ws(":",tag,concat_ws("|",raw_score,num,validity)) AS tag_raw,
+    validity,
+    tag,
+    update_dt,
+    if(raw_score>0.1,concat_ws(":",tag,cast(tag_score/tag_score_t AS string)),NULL) AS tag_value
+    FROM
+        (SELECT 
+        uid,
+        tag,
+        CAST(score AS string) AS raw_score,
+        CAST(num AS string) AS num,
+        CAST(validity AS string) AS validity,
+        update_dt,
+        score*ln(1+num) AS tag_score
+        FROM idl_limao_user_tag_shift_tmp
+        WHERE ds="{p0}"
+        ) s10
+    LEFT JOIN
+        (SELECT 
+        uid,
+        sum(score*ln(1+num)) AS tag_score_t
+        FROM idl_limao_user_tag_shift_tmp
+        WHERE ds="{p0}"
+        GROUP BY uid
+        ) s11 
+    ON s10.uid=s11.uid
+    ) s3
+GROUP BY uid;
+
